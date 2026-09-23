@@ -41,6 +41,7 @@ app.dependency_overrides[get_db] = _override_db
 
 @pytest.fixture(autouse=True)
 def setup():
+    app.dependency_overrides[get_db] = _override_db
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)

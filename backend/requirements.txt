@@ -8,3 +8,6 @@ pydantic[email-validation]
 pydantic-settings
 python-dotenv
 bcrypt
+openpyxl
+reportlab
+pytest

@@ -97,4 +97,23 @@ export const savingsAPI = {
   delete: (id) => api.delete(`/savings/${id}/`),
 };
 
+// Notification API
+export const notificationAPI = {
+  list: () => api.get('/notifications/'),
+  unread: () => api.get('/notifications/unread/'),
+  markRead: (id) => api.put(`/notifications/${id}/read/`),
+  markAllRead: () => api.put('/notifications/read-all/'),
+};
+
+// Report API
+export const reportAPI = {
+  monthly: (params) => api.get('/reports/monthly/', { params }),
+  download: (params) =>
+    api.get('/reports/monthly/', {
+      params,
+      responseType: 'blob',
+      headers: { Accept: '*/*' },
+    }),
+};
+
 export default api;

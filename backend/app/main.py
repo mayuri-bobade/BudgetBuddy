@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
-from .routers import accounts, expenses, incomes, transactions, budgets, savings
+from .routers import (
+    accounts, expenses, incomes, transactions, budgets, savings,
+    notifications, analytics, reports,
+)
 from .config import get_settings
 
 settings = get_settings()
@@ -32,6 +35,9 @@ app.include_router(incomes.router, prefix="/api/incomes", tags=["Incomes"])
 app.include_router(transactions.router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(budgets.router, prefix="/api/budgets", tags=["Budgets"])
 app.include_router(savings.router, prefix="/api/savings", tags=["Savings Goals"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 
 
 @app.get("/")

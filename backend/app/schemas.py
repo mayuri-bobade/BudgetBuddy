@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from datetime import date, datetime
 from typing import Optional, List
-from .models import ExpenseCategory, IncomeCategory
+from .models import ExpenseCategory, IncomeCategory, NotificationType
 
 
 # ─── User Schemas ────────────────────────────────────────────
@@ -360,3 +360,148 @@ class SavingsGoalResponse(BaseModel):
 class SavingsGoalListResponse(BaseModel):
     goals: List[SavingsGoalResponse]
     total: int
+
+
+# ─── Analytics Schemas ────────────────────────────────────────
+class AnalyticsCategoryItem(BaseModel):
+    category: str
+    total: float
+    count: int
+    percent_of_expenses: float
+
+
+class AnalyticsMonthlyTrend(BaseModel):
+    year: int
+    month: int
+    income: float
+    expenses: float
+    net: float
+
+
+class AnalyticsSavingsSummary(BaseModel):
+    total_goals: int
+    completed_goals: int
+    total_target: float
+    total_saved: float
+    overall_progress_percent: float
+
+
+class AnalyticsBudgetAllocation(BaseModel):
+    category: str
+    budgeted: float
+    spent: float
+    utilization_percent: float
+
+
+class AnalyticsBudgetSummary(BaseModel):
+    month: int
+    year: int
+    total_budget: float
+    total_spent: float
+    remaining: float
+    utilization_percent: float
+    allocations: List[AnalyticsBudgetAllocation]
+
+
+class AnalyticsFilters(BaseModel):
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    month: Optional[int] = None
+    year: Optional[int] = None
+
+
+class AnalyticsResponse(BaseModel):
+    total_income: float
+    total_expenses: float
+    net_savings: float
+    savings_rate_percent: float
+    income_count: int
+    expense_count: int
+    has_data: bool
+    category_summary: List[AnalyticsCategoryItem]
+    monthly_trends: List[AnalyticsMonthlyTrend]
+    savings_summary: AnalyticsSavingsSummary
+    budget_summary: Optional[AnalyticsBudgetSummary] = None
+    filters: AnalyticsFilters
+
+
+# ─── Report Schemas ───────────────────────────────────────────
+class ReportBreakdownItem(BaseModel):
+    label: str
+    total: float
+    count: int
+    percent: float
+
+
+class ReportSectionTotals(BaseModel):
+    total: float
+    count: int
+    breakdown: List[ReportBreakdownItem]
+
+
+class ReportBudgetAllocation(BaseModel):
+    category: str
+    budgeted: float
+    spent: float
+    remaining: float
+    utilization_percent: float
+
+
+class ReportBudgetSection(BaseModel):
+    total_budget: float
+    total_spent: float
+    remaining: float
+    utilization_percent: float
+    allocations: List[ReportBudgetAllocation]
+
+
+class ReportSavingsGoalItem(BaseModel):
+    id: int
+    name: str
+    target_amount: float
+    current_saved: float
+    progress_percent: float
+    is_completed: bool
+
+
+class ReportSavingsSection(BaseModel):
+    total_goals: int
+    total_target: float
+    total_saved: float
+    overall_progress_percent: float
+    goals: List[ReportSavingsGoalItem]
+
+
+class MonthlyReportResponse(BaseModel):
+    month: int
+    year: int
+    generated_at: datetime
+    period_start: date
+    period_end: date
+    income: ReportSectionTotals
+    expenses: ReportSectionTotals
+    net_savings: float
+    savings_rate_percent: float
+    budget: Optional[ReportBudgetSection] = None
+    savings: ReportSavingsSection
+    transaction_count: int
+    income_count: int
+    expense_count: int
+
+
+# ─── Notification Schemas ─────────────────────────────────────
+class NotificationResponse(BaseModel):
+    id: int
+    notification_type: NotificationType
+    message: str
+    is_read: bool
+    related_id: Optional[int] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class NotificationListResponse(BaseModel):
+    notifications: List[NotificationResponse]
+    total: int
+    unread_count: int

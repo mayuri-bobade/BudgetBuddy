@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { expenseAPI, incomeAPI, transactionAPI, budgetAPI, savingsAPI } from '../services/api';
+import { expenseAPI, incomeAPI, transactionAPI, budgetAPI, savingsAPI, notificationAPI, reportAPI } from '../services/api';
 
 const EXPENSE_CATEGORIES = [
   { value: 'food', label: 'Food' },
@@ -39,6 +39,7 @@ const NAV = [
   { id: 'savings', label: 'Savings' },
   { id: 'income', label: 'Income' },
   { id: 'expenses', label: 'Expenses' },
+  { id: 'reports', label: 'Reports' },
 ];
 
 function RecentActivity() {
@@ -130,6 +131,17 @@ export default function Dashboard() {
   const [progressGoalId, setProgressGoalId] = useState(null);
   const [progressAmount, setProgressAmount] = useState('');
 
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  const [reportMonth, setReportMonth] = useState(currentMonth());
+  const [reportYear, setReportYear] = useState(currentYear());
+  const [reportData, setReportData] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [downloading, setDownloading] = useState('');
+  const [reportError, setReportError] = useState('');
+
   const notify = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg({ type: '', text: '' }), 3000); };
 
   const fetchSummary = async () => { try { const r = await transactionAPI.summary(); setSummary(r.data); } catch {} };
@@ -143,12 +155,63 @@ export default function Dashboard() {
   const fetchBudgets = async () => {
     try { setBudgetLoading(true); const r = await budgetAPI.list({}); setBudgets(r.data.budgets); if (r.data.budgets.length && !selectedBudget) setSelectedBudget(r.data.budgets[0]); } catch {} finally { setBudgetLoading(false); }
   };
+  const fetchNotifications = async () => { try { const r = await notificationAPI.list(); setNotifications(r.data.notifications); setUnreadCount(r.data.unread_count); } catch {} };
+  const markNotifRead = async (id) => { try { await notificationAPI.markRead(id); fetchNotifications(); } catch {} };
+  const markAllNotifsRead = async () => { try { await notificationAPI.markAllRead(); fetchNotifications(); } catch {} };
+
+  const fetchReport = async (m = reportMonth, y = reportYear) => {
+    setReportLoading(true);
+    setReportError('');
+    try {
+      const r = await reportAPI.monthly({ month: m, year: y });
+      setReportData(r.data);
+    } catch (err) {
+      setReportData(null);
+      setReportError(err.response?.data?.detail || 'Failed to load report');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const downloadReport = async (format) => {
+    setDownloading(format);
+    setReportError('');
+    try {
+      const r = await reportAPI.download({ month: reportMonth, year: reportYear, format });
+      const blob = new Blob([r.data]);
+      const url = window.URL.createObjectURL(blob);
+      const ext = format === 'excel' || format === 'xlsx' || format === 'xls' ? 'xlsx' : format;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `budgetbuddy_report_${reportYear}-${String(reportMonth).padStart(2, '0')}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      notify('success', `Report downloaded as ${ext.toUpperCase()}`);
+    } catch (err) {
+      let detail = 'Download failed';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          detail = JSON.parse(text).detail || detail;
+        } catch {}
+      } else {
+        detail = err.response?.data?.detail || detail;
+      }
+      notify('error', detail);
+    } finally {
+      setDownloading('');
+    }
+  };
 
   useEffect(() => { fetchSummary(); }, []);
   useEffect(() => { fetchExpenses(); }, [filterExpCat]);
   useEffect(() => { fetchIncomes(); }, [filterIncSrc]);
   useEffect(() => { fetchBudgets(); }, []);
   useEffect(() => { fetchSavingsGoals(); }, []);
+  useEffect(() => { fetchNotifications(); }, []);
+  useEffect(() => { if (section === 'reports') fetchReport(); }, [section]);
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -273,6 +336,33 @@ export default function Dashboard() {
           <button className="mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>&#9776;</button>
           <h1>{sectionLabel}</h1>
           <div className="main-header-right">
+            <div className="notif-bell-wrapper">
+              <button className="notif-bell" onClick={() => setNotifOpen(!notifOpen)}>
+                &#128276;
+                {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+              </button>
+              {notifOpen && (
+                <div className="notif-dropdown">
+                  <div className="notif-dropdown-header">
+                    <span>Notifications</span>
+                    {unreadCount > 0 && <button className="notif-mark-all" onClick={markAllNotifsRead}>Mark all read</button>}
+                  </div>
+                  <div className="notif-list">
+                    {notifications.length === 0 ? (
+                      <div className="notif-empty">No notifications</div>
+                    ) : notifications.map((n) => (
+                      <div key={n.id} className={`notif-item ${n.is_read ? '' : 'unread'}`} onClick={() => { if (!n.is_read) markNotifRead(n.id); }}>
+                        <div className={`notif-dot ${n.notification_type}`} />
+                        <div className="notif-content">
+                          <div className="notif-message">{n.message}</div>
+                          <div className="notif-time">{new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
               {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </span>
@@ -595,6 +685,126 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══ REPORTS ═══ */}
+          {section === 'reports' && (
+            <div className="section-card anim-fadeInUp">
+              <div className="section-header">
+                <span className="section-title"><span className="section-title-mark" /> Monthly Reports</span>
+                <div className="section-actions">
+                  <select value={reportMonth} onChange={(e) => { const m = Number(e.target.value); setReportMonth(m); fetchReport(m, reportYear); }} className="filter-select">
+                    {MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                  </select>
+                  <select value={reportYear} onChange={(e) => { const y = Number(e.target.value); setReportYear(y); fetchReport(reportMonth, y); }} className="filter-select">
+                    <option value={2025}>2025</option><option value={2026}>2026</option><option value={2027}>2027</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="report-downloads">
+                <button className="btn-report" onClick={() => downloadReport('pdf')} disabled={!!downloading || reportLoading}>
+                  {downloading === 'pdf' ? 'Downloading…' : '⬇ PDF'}
+                </button>
+                <button className="btn-report" onClick={() => downloadReport('excel')} disabled={!!downloading || reportLoading}>
+                  {downloading === 'excel' ? 'Downloading…' : '⬇ Excel'}
+                </button>
+                <button className="btn-report" onClick={() => downloadReport('csv')} disabled={!!downloading || reportLoading}>
+                  {downloading === 'csv' ? 'Downloading…' : '⬇ CSV'}
+                </button>
+                <button className="btn-report btn-report-ghost" onClick={() => fetchReport()} disabled={reportLoading || !!downloading}>
+                  {reportLoading ? 'Loading…' : 'Refresh'}
+                </button>
+              </div>
+
+              {reportError && <div className="report-error">{reportError}</div>}
+
+              {reportLoading ? (
+                <div className="item-list">{[1, 2].map((i) => <div key={i} className="skeleton" style={{ height: 52, borderRadius: 10 }} />)}</div>
+              ) : reportData ? (
+                <>
+                  <div className="stats-grid" style={{ marginTop: 8 }}>
+                    <div className="stat-card is-income">
+                      <div className="stat-indicator income">In</div>
+                      <span className="stat-label">Income</span>
+                      <span className="stat-value income">INR {Number(reportData.income?.total ?? 0).toFixed(2)}</span>
+                    </div>
+                    <div className="stat-card is-expense">
+                      <div className="stat-indicator expense">Ex</div>
+                      <span className="stat-label">Expenses</span>
+                      <span className="stat-value expense">INR {Number(reportData.expenses?.total ?? 0).toFixed(2)}</span>
+                    </div>
+                    <div className="stat-card is-balance">
+                      <div className="stat-indicator balance">Bl</div>
+                      <span className="stat-label">Net Savings</span>
+                      <span className="stat-value" style={{ color: reportData.net_savings >= 0 ? 'var(--success)' : 'var(--error)' }}>
+                        INR {Number(reportData.net_savings ?? 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="report-meta">
+                    {MONTHS[reportMonth]} {reportData.year} · Savings rate {Number(reportData.savings_rate_percent ?? 0).toFixed(1)}% · {reportData.transaction_count ?? 0} transactions
+                  </div>
+
+                  {reportData.expenses?.breakdown?.length > 0 && (
+                    <div className="report-block">
+                      <h4>Expenses by Category</h4>
+                      <div className="item-list">
+                        {reportData.expenses.breakdown.map((c) => (
+                          <div key={c.label} className="list-item">
+                            <div className="item-tag" style={{ backgroundColor: EXPENSE_COLORS[c.label] || 'var(--primary)' }}>{c.label}</div>
+                            <div className="item-content">
+                              <div className="item-title">INR {Number(c.total).toFixed(2)}</div>
+                              <div className="item-meta">{c.count} transactions · {c.percent}% of expenses</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {reportData.income?.breakdown?.length > 0 && (
+                    <div className="report-block">
+                      <h4>Income Sources</h4>
+                      <div className="item-list">
+                        {reportData.income.breakdown.map((c) => (
+                          <div key={c.label} className="list-item">
+                            <div className="item-tag" style={{ backgroundColor: INCOME_COLORS[c.label] || 'var(--success)' }}>{c.label}</div>
+                            <div className="item-content">
+                              <div className="item-title">INR {Number(c.total).toFixed(2)}</div>
+                              <div className="item-meta">{c.count} transactions · {c.percent}% of income</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {reportData.budget?.allocations?.length > 0 && (
+                    <div className="report-block">
+                      <h4>Budget Utilization</h4>
+                      <div className="item-list">
+                        {reportData.budget.allocations.map((b) => (
+                          <div key={b.category} className="list-item">
+                            <div className="item-tag" style={{ backgroundColor: EXPENSE_COLORS[b.category] || 'var(--primary)' }}>{b.category}</div>
+                            <div className="item-content">
+                              <div className="item-title">{Number(b.utilization_percent).toFixed(1)}% used</div>
+                              <div className="item-meta">INR {Number(b.spent).toFixed(2)} of {Number(b.budgeted).toFixed(2)}</div>
+                              <div className="savings-bar" style={{ marginTop: 6 }}>
+                                <div className={`savings-fill ${b.utilization_percent >= 100 ? 'completed' : ''}`} style={{ width: `${Math.min(Number(b.utilization_percent), 100)}%`, backgroundColor: b.utilization_percent >= 100 ? 'var(--error)' : undefined }} />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="empty-state"><div className="empty-state-mark">Rp</div><p>No report loaded.</p></div>
               )}
             </div>
           )}

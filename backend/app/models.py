@@ -20,6 +20,12 @@ class IncomeCategory(str, enum.Enum):
     freelance = "freelance"
 
 
+class NotificationType(str, enum.Enum):
+    budget_limit = "budget_limit"
+    savings_milestone = "savings_milestone"
+    general = "general"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -42,6 +48,7 @@ class User(Base):
     incomes = relationship("Income", back_populates="user", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
     savings_goals = relationship("SavingsGoal", back_populates="user", cascade="all, delete-orphan")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
 
 
 class Profile(Base):
@@ -129,3 +136,17 @@ class SavingsGoal(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     user = relationship("User", back_populates="savings_goals")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    notification_type = Column(Enum(NotificationType), nullable=False)
+    message = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False)
+    related_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="notifications")

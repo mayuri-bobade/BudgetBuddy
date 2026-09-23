@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from ..database import get_db
 from .. import models, schemas, auth
+from ..budget_alerts import evaluate_budget
 
 router = APIRouter()
 
@@ -39,6 +40,7 @@ def create_budget(
 
     db.commit()
     db.refresh(budget)
+    evaluate_budget(db, current_user.id, budget.year, budget.month)
     return budget
 
 
@@ -96,6 +98,7 @@ def update_budget(
 
     db.commit()
     db.refresh(budget)
+    evaluate_budget(db, current_user.id, budget.year, budget.month)
     return budget
 
 

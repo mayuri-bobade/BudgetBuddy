@@ -65,6 +65,7 @@ def record(category, tc_id, description, input_data, expected, actual, status, d
 
 @pytest.fixture(autouse=True)
 def setup_teardown():
+    app.dependency_overrides[get_db] = override_db
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)

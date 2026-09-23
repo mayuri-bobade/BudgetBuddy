@@ -4,6 +4,7 @@ from sqlalchemy import desc
 from typing import Optional
 from ..database import get_db
 from .. import models, schemas, auth
+from ..budget_alerts import check_budget_alerts
 
 router = APIRouter()
 
@@ -24,6 +25,7 @@ def create_expense(
     db.add(expense)
     db.commit()
     db.refresh(expense)
+    check_budget_alerts(db, current_user.id, request.date)
     return expense
 
 
@@ -83,6 +85,7 @@ def update_expense(
 
     db.commit()
     db.refresh(expense)
+    check_budget_alerts(db, current_user.id, expense.date)
     return expense
 
 

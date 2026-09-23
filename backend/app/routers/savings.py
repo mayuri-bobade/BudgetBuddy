@@ -6,6 +6,31 @@ from .. import models, schemas, auth
 
 router = APIRouter()
 
+MILESTONES = [25, 50, 75, 100]
+
+
+def _check_savings_milestone(db: Session, user_id: int, goal: models.SavingsGoal):
+    if goal.target_amount <= 0:
+        return
+    pct = (float(goal.current_saved) / float(goal.target_amount)) * 100
+    for m in MILESTONES:
+        if pct >= m:
+            existing = db.query(models.Notification).filter(
+                models.Notification.user_id == user_id,
+                models.Notification.notification_type == models.NotificationType.savings_milestone,
+                models.Notification.related_id == goal.id,
+                models.Notification.message.contains(f"{m}%"),
+            ).first()
+            if not existing:
+                label = "completed" if m == 100 else f"reached {m}%"
+                db.add(models.Notification(
+                    user_id=user_id,
+                    notification_type=models.NotificationType.savings_milestone,
+                    message=f"Savings goal '{goal.name}' {label}! INR {float(goal.current_saved):.2f} / INR {float(goal.target_amount):.2f}",
+                    related_id=goal.id,
+                ))
+                db.commit()
+
 
 def calc_progress(current_saved: float, target_amount: float) -> float:
     if target_amount <= 0:
@@ -44,6 +69,7 @@ def create_savings_goal(
     db.add(goal)
     db.commit()
     db.refresh(goal)
+    _check_savings_milestone(db, current_user.id, goal)
     return goal_to_response(goal)
 
 
@@ -102,6 +128,7 @@ def update_savings_goal(
 
     db.commit()
     db.refresh(goal)
+    _check_savings_milestone(db, current_user.id, goal)
     return goal_to_response(goal)
 
 
@@ -130,6 +157,7 @@ def update_savings_progress(
 
     db.commit()
     db.refresh(goal)
+    _check_savings_milestone(db, current_user.id, goal)
     return goal_to_response(goal)
 
 
