@@ -694,6 +694,141 @@
   margin-bottom: var(--s-3);
 }
 
+/* ─── Analytics Dashboard ────────────────────────────────── */
+.ana-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+}
+.ana-metric {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+}
+.ana-metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ana-metric-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 4px;
+}
+.ana-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-4);
+  margin-top: var(--s-4);
+}
+.ana-block {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: var(--s-4);
+}
+.ana-block h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--s-3);
+}
+.ana-cat-row { margin-bottom: var(--s-3); }
+.ana-cat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.ana-cat-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+.ana-cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ana-cat-amt { color: var(--text); font-weight: 600; }
+.ana-cat-track {
+  height: 6px;
+  background: var(--bg-card);
+  border-radius: var(--r-full);
+  overflow: hidden;
+}
+.ana-cat-fill {
+  height: 100%;
+  border-radius: var(--r-full);
+  transition: width 0.5s var(--ease);
+  min-width: 2px;
+}
+.ana-cat-pct { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+.ana-legend {
+  display: flex;
+  gap: var(--s-4);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: var(--s-2);
+}
+.ana-legend-item { display: flex; align-items: center; gap: 6px; }
+.ana-legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+.ana-chart-box { width: 100%; }
+.ana-chart-scroll { width: 100%; overflow-x: auto; }
+.ana-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  height: 190px;
+  overflow-x: auto;
+  padding-top: var(--s-2);
+}
+.ana-chart-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 46px;
+  flex: 1;
+  height: 100%;
+}
+.ana-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 150px;
+  width: 100%;
+  justify-content: center;
+}
+.ana-bar {
+  width: 14px;
+  border-radius: 4px 4px 0 0;
+  min-height: 2px;
+  transition: height 0.5s var(--ease);
+}
+.ana-bar.income { background: linear-gradient(180deg, #34D399, var(--success)); }
+.ana-bar.expense { background: linear-gradient(180deg, #F87171, var(--error)); }
+.ana-month-label {
+  font-size: 10px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.ana-savings-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: var(--s-2);
+}
+.ana-savings-head span:last-child { font-weight: 700; color: var(--text); }
+@media (max-width: 900px) {
+  .ana-layout { grid-template-columns: 1fr; }
+}
+
 /* ─── Form Card (inline) ─────────────────────────────────── */
 .form-card {
   background: var(--bg-surface);
@@ -1155,6 +1290,8 @@
   .form-row { flex-direction: column; }
   .budget-grid { grid-template-columns: 1fr; }
   .savings-grid { grid-template-columns: 1fr; }
+  .ana-layout { grid-template-columns: 1fr; }
+  .ana-metrics { grid-template-columns: repeat(2, 1fr); }
   .section-header { flex-direction: column; gap: var(--s-3); align-items: flex-start; }
   .section-actions { width: 100%; flex-wrap: wrap; }
   .edit-form-row { flex-wrap: wrap; }

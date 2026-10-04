@@ -19,10 +19,10 @@ def _check_savings_milestone(db: Session, user_id: int, goal: models.SavingsGoal
                 models.Notification.user_id == user_id,
                 models.Notification.notification_type == models.NotificationType.savings_milestone,
                 models.Notification.related_id == goal.id,
-                models.Notification.message.contains(f"{m}%"),
+                models.Notification.message.contains(f"{m}%", autoescape=True),
             ).first()
             if not existing:
-                label = "completed" if m == 100 else f"reached {m}%"
+                label = "completed (100%)" if m == 100 else f"reached {m}%"
                 db.add(models.Notification(
                     user_id=user_id,
                     notification_type=models.NotificationType.savings_milestone,

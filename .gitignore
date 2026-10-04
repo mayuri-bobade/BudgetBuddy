@@ -13,6 +13,7 @@ frontend/dist/
 # Databases
 *.sqlite3
 test_*.db
+*.db-journal
 
 # IDE
 .vscode/

@@ -2,36 +2,15 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { expenseAPI, incomeAPI, transactionAPI, budgetAPI, savingsAPI, notificationAPI, reportAPI } from '../services/api';
-
-const EXPENSE_CATEGORIES = [
-  { value: 'food', label: 'Food' },
-  { value: 'travel', label: 'Travel' },
-  { value: 'shopping', label: 'Shopping' },
-  { value: 'education', label: 'Education' },
-  { value: 'entertainment', label: 'Entertainment' },
-  { value: 'miscellaneous', label: 'Misc' },
-];
-
-const INCOME_SOURCES = [
-  { value: 'pocket_money', label: 'Pocket Money' },
-  { value: 'scholarship', label: 'Scholarship' },
-  { value: 'freelance', label: 'Freelance' },
-];
-
-const EXPENSE_COLORS = {
-  food: '#EF4444', travel: '#3B82F6', shopping: '#8B5CF6',
-  education: '#10B981', entertainment: '#F59E0B', miscellaneous: '#6B7280',
-};
-const INCOME_COLORS = {
-  pocket_money: '#10B981', scholarship: '#3B82F6', freelance: '#8B5CF6',
-};
+import AnalyticsSection from '../components/analytics/AnalyticsSection';
+import {
+  EXPENSE_CATEGORIES, INCOME_SOURCES, EXPENSE_COLORS, INCOME_COLORS,
+  MONTHS, currentMonth, currentYear,
+} from '../constants/finance';
 
 const today = () => new Date().toISOString().split('T')[0];
 const emptyExpense = { amount: '', category: 'food', description: '', date: today() };
 const emptyIncome = { amount: '', source: 'pocket_money', description: '', date: today() };
-const currentMonth = () => new Date().getMonth() + 1;
-const currentYear = () => new Date().getFullYear();
-const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const NAV = [
   { id: 'overview', label: 'Overview' },
@@ -39,6 +18,7 @@ const NAV = [
   { id: 'savings', label: 'Savings' },
   { id: 'income', label: 'Income' },
   { id: 'expenses', label: 'Expenses' },
+  { id: 'analytics', label: 'Analytics' },
   { id: 'reports', label: 'Reports' },
 ];
 
@@ -414,12 +394,21 @@ export default function Dashboard() {
                     <div className="form-row">
                       <div className="form-group"><label>Month</label>
                         <select name="month" value={budgetCreate.month} onChange={(e) => setBudgetCreate({ ...budgetCreate, month: e.target.value })} required>
-                          {MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                          {MONTHS.slice(1).map((m, i) => (
+                            <option key={i + 1} value={i + 1} disabled={Number(budgetCreate.year) < currentYear() || (Number(budgetCreate.year) === currentYear() && i + 1 < currentMonth())}>{m}</option>
+                          ))}
                         </select>
                       </div>
                       <div className="form-group"><label>Year</label>
-                        <select name="year" value={budgetCreate.year} onChange={(e) => setBudgetCreate({ ...budgetCreate, year: e.target.value })} required>
-                          <option value={2025}>2025</option><option value={2026}>2026</option><option value={2027}>2027</option>
+                        <select name="year" value={budgetCreate.year} onChange={(e) => {
+                          const y = Number(e.target.value);
+                          const m = Number(budgetCreate.month);
+                          const month = y === currentYear() && m < currentMonth() ? currentMonth() : budgetCreate.month;
+                          setBudgetCreate({ ...budgetCreate, year: e.target.value, month });
+                        }} required>
+                          {[currentYear() - 1, currentYear(), currentYear() + 1].map((y) => (
+                            <option key={y} value={y} disabled={y < currentYear()}>{y}</option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -688,6 +677,9 @@ export default function Dashboard() {
               )}
             </div>
           )}
+
+          {/* ═══ ANALYTICS ═══ */}
+          {section === 'analytics' && <AnalyticsSection />}
 
           {/* ═══ REPORTS ═══ */}
           {section === 'reports' && (

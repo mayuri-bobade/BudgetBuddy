@@ -55,8 +55,8 @@ def _already_alerted(
         models.Notification.user_id == user_id,
         models.Notification.notification_type == models.NotificationType.budget_limit,
         models.Notification.related_id == budget_id,
-        models.Notification.message.contains(phase),
-        models.Notification.message.contains(scope_label),
+        models.Notification.message.contains(phase, autoescape=True),
+        models.Notification.message.contains(scope_label, autoescape=True),
     ).first()
     return existing is not None
 

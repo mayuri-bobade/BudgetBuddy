@@ -8,6 +8,7 @@ Run:  cd backend && python -m pytest test_analytics.py -v
 """
 
 import pytest
+from datetime import date
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -45,6 +46,15 @@ def setup_db():
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+@pytest.fixture
+def db():
+    session = TestingSessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 def auth_header(token):
@@ -423,6 +433,205 @@ class TestInvalidInput:
         headers = register(client, "ana_inv9")
         r = get_analytics(client, headers, year=0)
         assert r.status_code == 400
+
+
+# ─── Database Reconciliation ─────────────────────────────────
+
+class TestDatabaseReconciliation:
+    """Compare analytics API results directly against stored DB records."""
+
+    def test_totals_match_database(self, client, db):
+        headers = register(client, "ana_db_tot")
+        seed_known_data(client, headers)
+
+        user = db.query(models.User).filter(
+            models.User.username == "ana_db_tot",
+        ).first()
+        db_income = sum(
+            float(i.amount)
+            for i in db.query(models.Income).filter(models.Income.user_id == user.id)
+        )
+        db_expenses = sum(
+            float(e.amount)
+            for e in db.query(models.Expense).filter(models.Expense.user_id == user.id)
+        )
+
+        d = get_analytics(client, headers).json()
+        assert d["total_income"] == db_income
+        assert d["total_expenses"] == db_expenses
+        assert d["net_savings"] == round(db_income - db_expenses, 2)
+        assert d["income_count"] == (
+            db.query(models.Income).filter(models.Income.user_id == user.id).count()
+        )
+        assert d["expense_count"] == (
+            db.query(models.Expense).filter(models.Expense.user_id == user.id).count()
+        )
+
+    def test_category_summary_matches_database(self, client, db):
+        headers = register(client, "ana_db_cat")
+        seed_known_data(client, headers)
+
+        user = db.query(models.User).filter(
+            models.User.username == "ana_db_cat",
+        ).first()
+        db_by_cat: dict = {}
+        for e in db.query(models.Expense).filter(models.Expense.user_id == user.id):
+            cat = e.category.value
+            db_by_cat[cat] = db_by_cat.get(cat, 0.0) + float(e.amount)
+
+        d = get_analytics(client, headers).json()
+        api_by_cat = {c["category"]: c["total"] for c in d["category_summary"]}
+        assert api_by_cat == db_by_cat
+        assert round(sum(api_by_cat.values()), 2) == d["total_expenses"]
+
+    def test_monthly_trends_match_database(self, client, db):
+        headers = register(client, "ana_db_trend")
+        seed_known_data(client, headers)
+
+        user = db.query(models.User).filter(
+            models.User.username == "ana_db_trend",
+        ).first()
+        db_trends: dict = {}
+        for i in db.query(models.Income).filter(models.Income.user_id == user.id):
+            key = (i.date.year, i.date.month)
+            entry = db_trends.setdefault(key, {"income": 0.0, "expenses": 0.0})
+            entry["income"] += float(i.amount)
+        for e in db.query(models.Expense).filter(models.Expense.user_id == user.id):
+            key = (e.date.year, e.date.month)
+            entry = db_trends.setdefault(key, {"income": 0.0, "expenses": 0.0})
+            entry["expenses"] += float(e.amount)
+
+        d = get_analytics(client, headers).json()
+        assert len(d["monthly_trends"]) == len(db_trends)
+        for trend in d["monthly_trends"]:
+            key = (trend["year"], trend["month"])
+            assert key in db_trends
+            assert trend["income"] == db_trends[key]["income"]
+            assert trend["expenses"] == db_trends[key]["expenses"]
+            assert trend["net"] == round(
+                db_trends[key]["income"] - db_trends[key]["expenses"], 2
+            )
+
+    def test_savings_summary_matches_database(self, client, db):
+        headers = register(client, "ana_db_sav")
+        r = client.post("/api/savings/", json={
+            "name": "Fund A", "target_amount": 50000,
+        }, headers=headers)
+        goal_a = r.json()["id"]
+        client.put(f"/api/savings/{goal_a}/progress/", json={
+            "current_saved": 10000,
+        }, headers=headers)
+        r = client.post("/api/savings/", json={
+            "name": "Fund B", "target_amount": 20000,
+        }, headers=headers)
+        goal_b = r.json()["id"]
+        client.put(f"/api/savings/{goal_b}/progress/", json={
+            "current_saved": 20000,
+        }, headers=headers)
+
+        user = db.query(models.User).filter(
+            models.User.username == "ana_db_sav",
+        ).first()
+        goals = db.query(models.SavingsGoal).filter(
+            models.SavingsGoal.user_id == user.id,
+        ).all()
+        db_target = sum(float(g.target_amount) for g in goals)
+        db_saved = sum(float(g.current_saved) for g in goals)
+        db_completed = sum(1 for g in goals if g.is_completed)
+
+        d = get_analytics(client, headers).json()
+        s = d["savings_summary"]
+        assert s["total_goals"] == len(goals)
+        assert s["total_target"] == db_target
+        assert s["total_saved"] == db_saved
+        assert s["completed_goals"] == db_completed
+        expected_pct = (
+            round((db_saved / db_target) * 100, 2) if db_target > 0 else 0.0
+        )
+        assert s["overall_progress_percent"] == expected_pct
+
+    def test_budget_summary_matches_database(self, client, db):
+        headers = register(client, "ana_db_bud")
+        seed_known_data(client, headers)
+        r = client.post("/api/budgets/", json={
+            "month": 9, "year": 2026, "total_amount": 10000,
+            "allocations": [
+                {"category": "food", "amount": 5000},
+                {"category": "travel", "amount": 2000},
+            ],
+        }, headers=headers)
+        assert r.status_code == 201
+
+        user = db.query(models.User).filter(
+            models.User.username == "ana_db_bud",
+        ).first()
+        budget = db.query(models.Budget).filter(
+            models.Budget.user_id == user.id,
+            models.Budget.month == 9,
+            models.Budget.year == 2026,
+        ).first()
+        db_spent = sum(
+            float(e.amount)
+            for e in db.query(models.Expense).filter(
+                models.Expense.user_id == user.id,
+                models.Expense.date >= date(2026, 9, 1),
+                models.Expense.date <= date(2026, 9, 30),
+            )
+        )
+
+        d = get_analytics(client, headers, month=9, year=2026).json()
+        b = d["budget_summary"]
+        assert b["total_budget"] == float(budget.total_amount)
+        assert b["total_spent"] == db_spent
+        assert b["remaining"] == round(float(budget.total_amount) - db_spent, 2)
+        assert b["utilization_percent"] == round(
+            (db_spent / float(budget.total_amount)) * 100, 2
+        )
+
+        for alloc in b["allocations"]:
+            db_alloc = next(
+                a for a in budget.allocations if a.category.value == alloc["category"]
+            )
+            assert alloc["budgeted"] == float(db_alloc.amount)
+            cat_spent = sum(
+                float(e.amount)
+                for e in db.query(models.Expense).filter(
+                    models.Expense.user_id == user.id,
+                    models.Expense.category == db_alloc.category,
+                    models.Expense.date >= date(2026, 9, 1),
+                    models.Expense.date <= date(2026, 9, 30),
+                )
+            )
+            assert alloc["spent"] == cat_spent
+
+    def test_filtered_totals_match_database(self, client, db):
+        headers = register(client, "ana_db_filter")
+        seed_known_data(client, headers)
+
+        user = db.query(models.User).filter(
+            models.User.username == "ana_db_filter",
+        ).first()
+        db_sep_income = sum(
+            float(i.amount)
+            for i in db.query(models.Income).filter(
+                models.Income.user_id == user.id,
+                models.Income.date >= date(2026, 9, 1),
+                models.Income.date <= date(2026, 9, 30),
+            )
+        )
+        db_sep_expenses = sum(
+            float(e.amount)
+            for e in db.query(models.Expense).filter(
+                models.Expense.user_id == user.id,
+                models.Expense.date >= date(2026, 9, 1),
+                models.Expense.date <= date(2026, 9, 30),
+            )
+        )
+
+        d = get_analytics(client, headers, month=9, year=2026).json()
+        assert d["total_income"] == db_sep_income
+        assert d["total_expenses"] == db_sep_expenses
+        assert d["net_savings"] == round(db_sep_income - db_sep_expenses, 2)
 
 
 # ─── Authentication & User Isolation ─────────────────────────

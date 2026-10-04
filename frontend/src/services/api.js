@@ -116,4 +116,9 @@ export const reportAPI = {
     }),
 };
 
+// Analytics API
+export const analyticsAPI = {
+  get: (params) => api.get('/analytics/', { params }),
+};
+
 export default api;
