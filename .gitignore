@@ -33,3 +33,6 @@ Thumbs.db
 # Logs
 *.log
 dev.log
+.vercel
+.env*
+!.env.example
