@@ -2,6 +2,9 @@
 
 Personal budget planning and expense management platform. Track income and expenses, set monthly budgets with per-category allocations, monitor savings goals, and visualize your financial health from a single dashboard.
 
+# Live Demo
+https://budgetbuddy-frontend-seven.vercel.app
+
 ## Features
 
 - **Authentication** — JWT based register / login / logout with access + refresh token rotation, protected routes on the frontend.
